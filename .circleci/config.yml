@@ -1,0 +1,82 @@
+version: 2.1
+
+executors:
+  node-executor:
+    docker:
+      - image: circleci/node:14  # Use Node.js 14 Docker image for all jobs
+
+jobs:
+  install_dependencies:
+    executor: node-executor  # Use the defined node-executor
+    steps:
+      - checkout  # Pull the latest code from the repository
+      - run:
+          name: Install dependencies  # Install npm packages
+          command: npm install
+
+  run_tests:
+    executor: node-executor  # Use the defined node-executor
+    steps:
+      - checkout  # Pull the latest code from the repository
+      - run:
+          name: Run Cypress Tests  # Execute Cypress tests
+          command: npx cypress run
+      - store_artifacts:
+          path: cypress/screenshots  # Store screenshots as artifacts
+      - store_artifacts:
+          path: cypress/videos  # Store videos as artifacts
+      - store_test_results:
+          path: cypress/results  # Store test results for later inspection
+
+  deploy_to_environment:
+    executor: node-executor  # Use the defined node-executor
+    steps:
+      - checkout  # Pull the latest code from the repository
+      - run:
+          name: Deploy to environment  # Deploy to the correct environment based on branch
+          command: |
+            # Check which branch is being deployed
+            if [ "${CIRCLE_BRANCH}" == "qa" ]; then
+              echo "Deploying to QA environment"
+              # Insert your QA deployment script or command here
+            elif [ "${CIRCLE_BRANCH}" == "preprod" ]; then
+              echo "Deploying to Preprod environment"
+              # Insert your Preprod deployment script or command here
+            elif [ "${CIRCLE_BRANCH}" == "prod" ]; then
+              echo "Deploying to Prod environment"
+              # Insert your Prod deployment script or command here
+            else
+              echo "Unknown environment"
+              exit 1  # Fail the job if the branch doesn't match known environments
+
+workflows:
+  version: 2
+  build_test_and_deploy:
+    jobs:
+      - install_dependencies:
+          filters:
+            branches:
+              only:
+                - qa  # Only run this job for the QA branch
+                - preprod  # Only run this job for the Preprod branch
+                - prod  # Only run this job for the Prod branch
+
+      - run_tests:
+          requires:
+            - install_dependencies  # Run tests only after dependencies are installed
+          filters:
+            branches:
+              only:
+                - qa  # Only run this job for the QA branch
+                - preprod  # Only run this job for the Preprod branch
+                - prod  # Only run this job for the Prod branch
+
+      - deploy_to_environment:
+          requires:
+            - run_tests  # Deploy only after tests have successfully run
+          filters:
+            branches:
+              only:
+                - qa  # Only deploy for the QA branch
+                - preprod  # Only deploy for the Preprod branch
+                - prod  # Only deploy for the Prod branch
